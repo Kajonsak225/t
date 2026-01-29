@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>ESP8266 Smart Sensor</title>
+
+<!-- Firebase v8 -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<style>
+  body {
+    font-family: "Segoe UI", sans-serif;
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    color: #fff;
+    text-align: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 30px;
+  }
+
+  h1 {
+    margin-bottom: 10px;
+  }
+
+  .status {
+    font-size: 20px;
+    margin-bottom: 20px;
+    padding: 10px;
+    border-radius: 8px;
+    display: inline-block;
+  }
+
+  .on {
+    background: #1abc9c;
+  }
+
+  .off {
+    background: #e74c3c;
+  }
+
+  button {
+    font-size: 18px;
+    padding: 12px 30px;
+    margin: 10px;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .btn-on {
+    background: #2ecc71;
+    color: #000;
+  }
+
+  .btn-off {
+    background: #e74c3c;
+    color: #fff;
+  }
+
+  button:hover {
+    transform: scale(1.05);
+  }
+
+  .card {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    width: 320px;
+    margin: 30px auto;
+    padding: 20px;
+    display: none;
+  }
+
+  .value {
+    font-size: 28px;
+    margin: 10px 0;
+  }
+</style>
+</head>
+
+<body>
+
+<h1>🌱 ESP8266 Sensor Dashboard</h1>
+
+<div id="systemStatus" class="status off">🔴 ระบบปิดอยู่</div>
+
+<br>
+
+<button class="btn-on" onclick="systemOn()">🟢 เปิดระบบ</button>
+<button class="btn-off" onclick="systemOff()">🔴 ปิดระบบ</button>
+
+<div class="card" id="sensorBox">
+  <h2>📡 Realtime Sensor</h2>
+  <div class="value">🌱 Soil: <span id="soil">--</span> %</div>
+  <div class="value">🌡 Temp: <span id="temp">--</span> °C</div>
+  <div class="value">🚨 Alarm: <span id="alarm">--</span></div>
+</div>
+
+<script>
+  // ===== Firebase Config =====
+  const firebaseConfig = {
+    apiKey: "AIzaSyC1a-XkNqLQ-fR9K9G3rRq4H3k9SKw9EF0",
+    databaseURL: "https://kjszz-1a818-default-rtdb.firebaseio.com/"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const sensorBox = document.getElementById("sensorBox");
+  const statusBox = document.getElementById("systemStatus");
+  let sensorRef = null;
+
+  // ===== เปิดระบบ =====
+  function systemOn() {
+    db.ref("control/enable").set(true);
+  }
+
+  // ===== ปิดระบบ =====
+  function systemOff() {
+    db.ref("control/enable").set(false);
+  }
+
+  // ===== ฟังสถานะระบบ =====
+ db.ref("control/enable").on("value", snap => {
+  const enable = snap.val();
+
+  if (enable === true) {
+    // ===== ระบบเปิด =====
+    statusBox.innerText = "🟢 ระบบกำลังทำงาน";
+    statusBox.className = "status on";
+    sensorBox.style.display = "block";
+
+    if (!sensorListener) {
+      sensorRef = db.ref("sensor");
+      sensorRef.on("value", s => {
+        const d = s.val();
+        if (!d) return;
+
+        document.getElementById("soil").innerText =
+          d.online ? d.soil : "--";
+
+        document.getElementById("temp").innerText =
+          d.online ? d.temperature : "--";
+
+        document.getElementById("alarm").innerText =
+          d.online
+            ? (d.alarm ? "ON 🔔" : "OFF ✅")
+            : "OFF";
+      });
+
+      sensorListener = true;
+    }
+
+  } else {
+    // ===== ระบบปิด =====
+    statusBox.innerText = "🔴 ระบบปิดอยู่";
+    statusBox.className = "status off";
+    sensorBox.style.display = "none";
+
+    document.getElementById("soil").innerText = "--";
+    document.getElementById("temp").innerText = "--";
+    document.getElementById("alarm").innerText = "--";
+
+    if (sensorRef) {
+      sensorRef.off();
+      sensorRef = null;
+      sensorListener = false;
+    }
+  }
+});
+
